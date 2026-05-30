@@ -1,33 +1,75 @@
-AWSTemplateFormatVersion: '2012-10-17'
-Description: 'TP AWS Lambda - Code charge depuis src/main.py'
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'TP AWS Lambda - Code chargé depuis S3'
 
 Parameters:
   Environment:
     Type: String
-    Description: 'Environnement name (e.g. votre identifiant sans le learnaws)'
-    Default: 'asonhouin'
+    Description: 'Nom de l environnement'
+    Default: 'kdjagba'
   BucketName:
     Type: String
-    Description: 'S3 bucket name (e.g. votre identifiant sans le learnaws + -bucket pour différencier du bucket de votre voisin)'
+    Description: 'Nom du bucket S3'
     Default: 's3-bucket-trigger-lambda'
+  LambdaCodeBucket:
+    Type: String
+    Description: 'Bucket S3 contenant le code Lambda (zip)'
+  LambdaCodeKey:
+    Type: String
+    Description: 'Clé S3 du zip (ex: src/main.zip)'
+    Default: 'src/main.zip'
 
 Resources:
+
+  # Rôle IAM pour Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: [sts:AssumeRole]
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub '${Environment}-LambdaS3AccessPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub 'arn:aws:s3:::${S3Bucket}/*'  
+
   # Fonction Lambda
-  LambdaTigger:
+  LambdaTrigger:                                             
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub '${Environment}-lambda-trigger'
       Handler: main.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Runtime: python3.12
-      Code: ../src
+      Code:                                                  
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeKey
 
-  # S3 bucket pour stocker les fichier 
+  # Permission pour que S3 puisse invoquer Lambda
+  LambdaInvokePermission:                                   
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt LambdaTrigger.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub 'arn:aws:s3:::${Environment}-${BucketName}'
+
+  # Bucket S3
   S3Bucket:
     Type: AWS::S3::Bucket
+    DependsOn: LambdaInvokePermission                       
     Properties:
-      BucketName: !sub '${Environment}-${BucketName}'
+      BucketName: !Sub '${Environment}-${BucketName}'       
       NotificationConfiguration:
         LambdaConfigurations:
           - Event: 's3:ObjectCreated:*'
-            Function: !GetAtt LambdaFunction.Arn
+            Function: !GetAtt LambdaTrigger.Arn           
