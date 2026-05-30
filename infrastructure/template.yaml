@@ -47,6 +47,9 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Runtime: python3.12
       Code: ../src
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: 's3-trigger-db'
 
 #S3 Bucket pour stocker les fichiers et déclencher la Lambda, avec permission d'invocation pour la Lambda
   LambdaInvokePermission:
