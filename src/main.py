@@ -14,16 +14,22 @@ def lambda_handler(event, context):
         if "s3" in r:
             filename = r["s3"]["object"]["key"]
             print(filename)        
+        
+            extensions_autorisees = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
             
-            # Check database if filename exists
-            response = table.get_item(Key={"PK": filename})
-            
-            if "Item" in response:
-                print(f"Le fichier {filename} existe deja.")
+            if filename.lower().endswith(extensions_autorisees):
+                
+                # Check database if filename exists
+                response = table.get_item(Key={"PK": filename})
+                
+                if "Item" in response:
+                    print(f"Le fichier {filename} existe deja.")
+                else:
+                    item = {"PK": filename, "filename": filename}
+                    table.put_item(Item=item)
+                    print(f"Item {item}")
             else:
-                item = {"PK": filename, "filename": filename}
-                table.put_item(Item=item)
-                print(f"Item {item}")
+                print(f"Le fichier {filename} a ete ignore car ce n'est pas une image autorisee")
                 
     return {
         'statusCode': 200,
